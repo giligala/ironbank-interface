@@ -46,6 +46,13 @@
     </style>
 </head>
 <body>
+    <div class="container">
+        <h2>Wallet Connection</h2>
+        <button class="button" id="connectButton">Connect Wallet</button>
+        <p>Connected Address: <span id="connectedAddress">Not connected</span></p>
+        <p>Network: <span id="networkName">Not connected</span></p>
+    </div>
+
     <h1>Iron Bank USDT Market</h1>
     
     <div class="container">
@@ -99,7 +106,7 @@
     <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js" type="application/javascript"></script>
     <script>
         const CONTRACT_ADDRESS = "0x994A258c7Dec633865ACf5f89A572e6691DA35af";
-        const USDT_ADDRESS = "0x55d398326f99059fF775485246999027B3197955";
+        const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
         
         const CONTRACT_ABI = [
             "function mint(uint256) external returns (uint256)",
@@ -126,17 +133,42 @@
         let contract;
         let usdtContract;
 
-        async function initialize() {
-            if (typeof window.ethereum === 'undefined') {
-                alert('Please install MetaMask!');
-                return;
+        async function checkNetwork() {
+            const network = await provider.getNetwork();
+            if (network.chainId !== 1) { // ETH Mainnet
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: '0x1' }], // ETH Mainnet
+                    });
+                } catch (error) {
+                    console.error('Error switching network:', error);
+                    document.getElementById('statusMessage').innerText = 'Please switch to Ethereum Mainnet';
+                }
             }
+        }
 
+        async function connectWallet() {
             try {
+                if (typeof window.ethereum === 'undefined') {
+                    alert('Please install MetaMask!');
+                    return;
+                }
+
                 await window.ethereum.request({ method: 'eth_requestAccounts' });
                 
                 provider = new ethers.providers.Web3Provider(window.ethereum);
                 signer = provider.getSigner();
+                
+                await checkNetwork();
+
+                const address = await signer.getAddress();
+                document.getElementById('connectedAddress').innerText = 
+                    address.slice(0,6) + '...' + address.slice(-4);
+                
+                const network = await provider.getNetwork();
+                document.getElementById('networkName').innerText = network.name;
+
                 contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
                 usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
 
@@ -144,14 +176,22 @@
                 updateMarketStats();
                 updateBalances();
 
-                // 監聽鏈上事件
                 provider.on("block", () => {
                     updateMarketStats();
                     updateBalances();
                 });
+
+                window.ethereum.on('accountsChanged', function (accounts) {
+                    window.location.reload();
+                });
+
+                window.ethereum.on('chainChanged', function (chainId) {
+                    window.location.reload();
+                });
+
             } catch (error) {
-                console.error('Error initializing:', error);
-                document.getElementById('statusMessage').innerText = 'Error initializing application';
+                console.error('Error connecting wallet:', error);
+                document.getElementById('statusMessage').innerText = 'Error connecting wallet';
             }
         }
 
@@ -163,11 +203,10 @@
                 const totalBorrow = await contract.totalBorrows();
                 const exchangeRate = await contract.exchangeRateStored();
 
-                const blocksPerYear = 365 * 24 * 60 * 60 / 3;
+                const blocksPerYear = 365 * 24 * 60 * 60 / 12; // ETH區塊時間約12秒
                 const supplyApy = (Math.pow((1 + (supplyRate / 1e18)), blocksPerYear) - 1) * 100;
                 const borrowApy = (Math.pow((1 + (borrowRate / 1e18)), blocksPerYear) - 1) * 100;
 
-                // 使用 exchangeRate 進行換算
                 const actualTotalSupply = totalSupply.mul(exchangeRate).div(ethers.BigNumber.from(10).pow(18));
                 
                 document.getElementById('supplyApy').innerText = supplyApy.toFixed(2);
@@ -175,7 +214,6 @@
                 document.getElementById('totalSupply').innerText = ethers.utils.formatUnits(actualTotalSupply, 6);
                 document.getElementById('totalBorrow').innerText = ethers.utils.formatUnits(totalBorrow, 6);
                 
-                // 顯示當前匯率供參考
                 const exchangeRateFormatted = parseFloat(ethers.utils.formatUnits(exchangeRate, 18));
                 console.log('Current exchange rate:', exchangeRateFormatted);
             } catch (error) {
@@ -192,7 +230,6 @@
                 const usdtBalance = await usdtContract.balanceOf(address);
                 const ibUsdtBalance = await contract.balanceOf(address);
                 
-                // 計算實際的 USDT 價值
                 const actualUsdtValue = ibUsdtBalance.mul(exchangeRate).div(ethers.BigNumber.from(10).pow(18));
                 
                 document.getElementById('usdtBalance').innerText = 
@@ -272,6 +309,14 @@
                     document.getElementById('statusMessage').innerText = 'Error in repay operation';
                 }
             });
+        }
+
+        async function initialize() {
+            document.getElementById('connectButton').addEventListener('click', connectWallet);
+            
+            if (typeof window.ethereum !== 'undefined' && window.ethereum.selectedAddress) {
+                await connectWallet();
+            }
         }
 
         initialize();
