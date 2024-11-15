@@ -2,94 +2,161 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>USDT 餘額查詢</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <title>Iron Bank Interface</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
             padding: 20px;
         }
-        button {
-            padding: 10px;
-            margin: 5px;
+        .container {
+            display: grid;
+            gap: 20px;
         }
-        .info {
+        .card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0052a3;
+        }
+        .input-group {
             margin: 10px 0;
+        }
+        input {
+            padding: 8px;
+            width: 200px;
         }
     </style>
 </head>
 <body>
-    <button onclick="connectWallet()">連接錢包</button>
-    <p id="status"></p>
-    <div class="info">
-        <p>USDT 餘額: <span id="usdtBalance">未連接</span> USDT</p>
-        <p>原始數值: <span id="rawBalance">未連接</span></p>
+    <div class="container">
+        <div class="card">
+            <h2>帳戶資訊</h2>
+            <button onclick="connectWallet()">連接錢包</button>
+            <p id="accountInfo">未連接</p>
+        </div>
+
+        <div class="card">
+            <h2>存款</h2>
+            <div class="input-group">
+                <input type="number" id="depositAmount" placeholder="輸入金額">
+                <button onclick="deposit()">存入</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>借貸</h2>
+            <div class="input-group">
+                <input type="number" id="borrowAmount" placeholder="輸入金額">
+                <button onclick="borrow()">借出</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>資產概況</h2>
+            <p>存款餘額: <span id="depositBalance">0</span></p>
+            <p>借貸餘額: <span id="borrowBalance">0</span></p>
+            <p>可借額度: <span id="borrowLimit">0</span></p>
+        </div>
     </div>
 
     <script>
-        let userAddress = null;
+        let userAddress;
+        // 這裡需要根據實際部署的合約地址進行修改
+        const CONTRACT_ADDRESS = "YOUR_CONTRACT_ADDRESS";
         
-        const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
-        
-        const USDT_ABI = [
-            {
-                "constant": true,
-                "inputs": [{"name": "who", "type": "address"}],
-                "name": "balanceOf",
-                "outputs": [{"name": "", "type": "uint256"}],
-                "type": "function"
-            }
+        // 簡化版ABI,實際使用時需要完整的ABI
+        const CONTRACT_ABI = [
+            "function deposit(uint256 amount) external",
+            "function borrow(uint256 amount) external",
+            "function getAccountSnapshot(address account) external view returns (uint256, uint256, uint256)",
         ];
 
         async function connectWallet() {
-            if (typeof window.ethereum !== 'undefined') {
-                try {
-                    const accounts = await window.ethereum.request({ 
+            try {
+                if (typeof window.ethereum !== 'undefined') {
+                    const accounts = await ethereum.request({ 
                         method: 'eth_requestAccounts' 
                     });
                     userAddress = accounts[0];
-                    document.getElementById('status').innerHTML = 
-                        '連接成功！地址: ' + userAddress;
-                    
-                    await getUSDTBalance();
-
-                    window.ethereum.on('accountsChanged', function (accounts) {
-                        userAddress = accounts[0];
-                        getUSDTBalance();
-                    });
-
-                } catch (error) {
-                    document.getElementById('status').innerHTML = 
-                        '連接失敗：' + error.message;
+                    document.getElementById('accountInfo').textContent = 
+                        `已連接: ${userAddress}`;
+                    updateBalances();
+                } else {
+                    alert('請安裝 MetaMask!');
                 }
-            } else {
-                document.getElementById('status').innerHTML = 
-                    '請安裝 MetaMask';
+            } catch (error) {
+                console.error(error);
+                alert('連接錢包失敗');
             }
         }
 
-        async function getUSDTBalance() {
+        async function getContract() {
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const signer = provider.getSigner();
+            return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        }
+
+        async function deposit() {
+            try {
+                const amount = document.getElementById('depositAmount').value;
+                const contract = await getContract();
+                const tx = await contract.deposit(
+                    ethers.utils.parseEther(amount)
+                );
+                await tx.wait();
+                alert('存款成功!');
+                updateBalances();
+            } catch (error) {
+                console.error(error);
+                alert('存款失敗');
+            }
+        }
+
+        async function borrow() {
+            try {
+                const amount = document.getElementById('borrowAmount').value;
+                const contract = await getContract();
+                const tx = await contract.borrow(
+                    ethers.utils.parseEther(amount)
+                );
+                await tx.wait();
+                alert('借貸成功!');
+                updateBalances();
+            } catch (error) {
+                console.error(error);
+                alert('借貸失敗');
+            }
+        }
+
+        async function updateBalances() {
             if (!userAddress) return;
             
             try {
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, provider);
-                
-                const balance = await usdtContract.balanceOf(userAddress);
-                
-                // 顯示原始數值以便對照
-                document.getElementById('rawBalance').innerHTML = 
-                    balance.toString();
-                
-                // USDT 固定使用 6 位小數
-                const usdtBalance = ethers.utils.formatUnits(balance, 6);
-                
-                document.getElementById('usdtBalance').innerHTML = 
-                    parseFloat(usdtBalance).toFixed(2);
+                const contract = await getContract();
+                const [depositBal, borrowBal, borrowLim] = 
+                    await contract.getAccountSnapshot(userAddress);
+
+                document.getElementById('depositBalance').textContent = 
+                    ethers.utils.formatEther(depositBal);
+                document.getElementById('borrowBalance').textContent = 
+                    ethers.utils.formatEther(borrowBal);
+                document.getElementById('borrowLimit').textContent = 
+                    ethers.utils.formatEther(borrowLim);
             } catch (error) {
-                document.getElementById('usdtBalance').innerHTML = 
-                    '查詢失敗';
-                console.error('查詢USDT餘額失敗：', error);
+                console.error(error);
             }
         }
     </script>
