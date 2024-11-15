@@ -37,6 +37,13 @@
                 "name": "balanceOf",
                 "outputs": [{"name": "", "type": "uint256"}],
                 "type": "function"
+            },
+            {
+                "constant": true,
+                "inputs": [],
+                "name": "decimals",
+                "outputs": [{"name": "", "type": "uint8"}],
+                "type": "function"
             }
         ];
 
@@ -74,9 +81,13 @@
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
                 const usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, provider);
                 
+                // 獲取 decimals
+                const decimals = await usdtContract.decimals();
+                // 獲取餘額
                 const balance = await usdtContract.balanceOf(userAddress);
                 
-                const usdtBalance = balance.toString() / 1000000;
+                // 使用正確的 decimals 進行轉換
+                const usdtBalance = balance.toString() / Math.pow(10, decimals);
                 
                 document.getElementById('usdtBalance').innerHTML = 
                     usdtBalance.toFixed(2);
