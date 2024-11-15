@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>USDT 餘額查詢</title>
-    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -26,12 +26,20 @@
     </div>
 
     <script>
+        // 確保 ethers.js 已載入
+        window.addEventListener('load', function() {
+            if (typeof ethers === 'undefined') {
+                console.error('Ethers.js 未正確載入');
+                return;
+            }
+        });
+
         let userAddress = null;
         
         // USDT 合約地址（以太坊主網）
         const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
         
-        // USDT ABI（只需要 balanceOf 功能）
+        // USDT ABI
         const USDT_ABI = [
             {
                 "constant": true,
@@ -75,6 +83,11 @@
             if (!userAddress) return;
             
             try {
+                // 確保 ethers 已定義
+                if (typeof ethers === 'undefined') {
+                    throw new Error('Ethers.js 未載入');
+                }
+
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
                 const usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, provider);
                 
