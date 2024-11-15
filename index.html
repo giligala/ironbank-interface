@@ -23,6 +23,7 @@
     <p id="status"></p>
     <div class="info">
         <p>USDT 餘額: <span id="usdtBalance">未連接</span> USDT</p>
+        <p>原始數值: <span id="rawBalance">未連接</span></p>
     </div>
 
     <script>
@@ -36,13 +37,6 @@
                 "inputs": [{"name": "who", "type": "address"}],
                 "name": "balanceOf",
                 "outputs": [{"name": "", "type": "uint256"}],
-                "type": "function"
-            },
-            {
-                "constant": true,
-                "inputs": [],
-                "name": "decimals",
-                "outputs": [{"name": "", "type": "uint8"}],
                 "type": "function"
             }
         ];
@@ -81,16 +75,17 @@
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
                 const usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, provider);
                 
-                // 獲取 decimals
-                const decimals = await usdtContract.decimals();
-                // 獲取餘額
                 const balance = await usdtContract.balanceOf(userAddress);
                 
-                // 使用正確的 decimals 進行轉換
-                const usdtBalance = balance.toString() / Math.pow(10, decimals);
+                // 顯示原始數值以便對照
+                document.getElementById('rawBalance').innerHTML = 
+                    balance.toString();
+                
+                // USDT 固定使用 6 位小數
+                const usdtBalance = ethers.utils.formatUnits(balance, 6);
                 
                 document.getElementById('usdtBalance').innerHTML = 
-                    usdtBalance.toFixed(2);
+                    parseFloat(usdtBalance).toFixed(2);
             } catch (error) {
                 document.getElementById('usdtBalance').innerHTML = 
                     '查詢失敗';
