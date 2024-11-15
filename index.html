@@ -2,22 +2,65 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>MetaMask 連接測試</title>
+    <title>USDT 餘額查詢</title>
     <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        button {
+            padding: 10px;
+            margin: 5px;
+        }
+        .info {
+            margin: 10px 0;
+        }
+    </style>
 </head>
 <body>
     <button onclick="connectWallet()">連接錢包</button>
     <p id="status"></p>
+    <div class="info">
+        <p>USDT 餘額: <span id="usdtBalance">未連接</span> USDT</p>
+    </div>
 
     <script>
+        let userAddress = null;
+        
+        // USDT 合約地址（以太坊主網）
+        const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+        
+        // USDT ABI（只需要 balanceOf 功能）
+        const USDT_ABI = [
+            {
+                "constant": true,
+                "inputs": [{"name": "who", "type": "address"}],
+                "name": "balanceOf",
+                "outputs": [{"name": "", "type": "uint256"}],
+                "type": "function"
+            }
+        ];
+
         async function connectWallet() {
             if (typeof window.ethereum !== 'undefined') {
                 try {
                     const accounts = await window.ethereum.request({ 
                         method: 'eth_requestAccounts' 
                     });
+                    userAddress = accounts[0];
                     document.getElementById('status').innerHTML = 
-                        '連接成功！地址: ' + accounts[0];
+                        '連接成功！地址: ' + userAddress;
+                    
+                    // 連接成功後查詢 USDT 餘額
+                    await getUSDTBalance();
+
+                    // 監聽帳戶變化
+                    window.ethereum.on('accountsChanged', function (accounts) {
+                        userAddress = accounts[0];
+                        getUSDTBalance();
+                    });
+
                 } catch (error) {
                     document.getElementById('status').innerHTML = 
                         '連接失敗：' + error.message;
@@ -25,6 +68,27 @@
             } else {
                 document.getElementById('status').innerHTML = 
                     '請安裝 MetaMask';
+            }
+        }
+
+        async function getUSDTBalance() {
+            if (!userAddress) return;
+            
+            try {
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, provider);
+                
+                const balance = await usdtContract.balanceOf(userAddress);
+                
+                // USDT 的 decimals 是 6，所以需要除以 10^6
+                const usdtBalance = balance.toString() / 1000000;
+                
+                document.getElementById('usdtBalance').innerHTML = 
+                    usdtBalance.toFixed(2);
+            } catch (error) {
+                document.getElementById('usdtBalance').innerHTML = 
+                    '查詢失敗';
+                console.error('查詢USDT餘額失敗：', error);
             }
         }
     </script>
