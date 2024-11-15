@@ -44,6 +44,8 @@
             margin-top: 10px;
         }
     </style>
+    <!-- 修改：使用新的 ethers.js CDN -->
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
 </head>
 <body>
     <div class="container">
@@ -85,153 +87,155 @@
 
     <div id="statusMessage"></div>
 
-    <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js" type="application/javascript"></script>
     <script>
-        let provider;
-        let signer;
-        let contract;
-        let usdtContract;
+        // 等待页面和ethers完全加载
+        window.addEventListener('load', () => {
+            let provider;
+            let signer;
+            let contract;
+            let usdtContract;
 
-        const CONTRACT_ADDRESS = "0x994A258c7Dec633865ACf5f89A572e6691DA35af";
-        const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+            const CONTRACT_ADDRESS = "0x994A258c7Dec633865ACf5f89A572e6691DA35af";
+            const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 
-        const CONTRACT_ABI = [
-            "function mint(uint256) external returns (uint256)",
-            "function redeem(uint256) external returns (uint256)",
-            "function balanceOf(address) external view returns (uint256)",
-            "function totalSupply() external view returns (uint256)",
-            "function totalBorrows() external view returns (uint256)",
-            "function borrowRatePerBlock() external view returns (uint256)",
-            "function supplyRatePerBlock() external view returns (uint256)"
-        ];
+            const CONTRACT_ABI = [
+                "function mint(uint256) external returns (uint256)",
+                "function redeem(uint256) external returns (uint256)",
+                "function balanceOf(address) external view returns (uint256)",
+                "function totalSupply() external view returns (uint256)",
+                "function totalBorrows() external view returns (uint256)",
+                "function borrowRatePerBlock() external view returns (uint256)",
+                "function supplyRatePerBlock() external view returns (uint256)"
+            ];
 
-        const USDT_ABI = [
-            "function approve(address, uint256) external returns (bool)",
-            "function balanceOf(address) external view returns (uint256)",
-            "function allowance(address, address) external view returns (uint256)"
-        ];
+            const USDT_ABI = [
+                "function approve(address, uint256) external returns (bool)",
+                "function balanceOf(address) external view returns (uint256)",
+                "function allowance(address, address) external view returns (uint256)"
+            ];
 
-        async function connectWallet() {
-            if (typeof window.ethereum !== 'undefined') {
+            async function connectWallet() {
+                if (typeof window.ethereum !== 'undefined') {
+                    try {
+                        // Request account access
+                        await window.ethereum.request({ method: 'eth_requestAccounts' });
+                        
+                        provider = new ethers.providers.Web3Provider(window.ethereum);
+                        signer = provider.getSigner();
+                        
+                        const address = await signer.getAddress();
+                        document.getElementById('connectedAddress').innerText = 
+                            address.slice(0,6) + '...' + address.slice(-4);
+
+                        const network = await provider.getNetwork();
+                        document.getElementById('networkName').innerText = network.name;
+
+                        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+                        usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
+
+                        await updateBalances();
+                        await updateMarketStats();
+                        setupEventListeners();
+
+                    } catch (error) {
+                        console.error("Error connecting wallet:", error);
+                        document.getElementById('statusMessage').innerText = 
+                            'Failed to connect wallet: ' + error.message;
+                    }
+                } else {
+                    alert('Please install MetaMask!');
+                }
+            }
+
+            async function updateBalances() {
                 try {
-                    // Request account access
-                    await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    
-                    provider = new ethers.providers.Web3Provider(window.ethereum);
-                    signer = provider.getSigner();
-                    
                     const address = await signer.getAddress();
-                    document.getElementById('connectedAddress').innerText = 
-                        address.slice(0,6) + '...' + address.slice(-4);
+                    const usdtBalance = await usdtContract.balanceOf(address);
+                    const ibUsdtBalance = await contract.balanceOf(address);
 
-                    const network = await provider.getNetwork();
-                    document.getElementById('networkName').innerText = network.name;
-
-                    contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-                    usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
-
-                    await updateBalances();
-                    await updateMarketStats();
-                    setupEventListeners();
-
+                    document.getElementById('usdtBalance').innerText = 
+                        ethers.utils.formatUnits(usdtBalance, 6);
+                    document.getElementById('ibUsdtBalance').innerText = 
+                        ethers.utils.formatUnits(ibUsdtBalance, 6);
                 } catch (error) {
-                    console.error("Error connecting wallet:", error);
-                    document.getElementById('statusMessage').innerText = 
-                        'Failed to connect wallet: ' + error.message;
+                    console.error("Error updating balances:", error);
                 }
-            } else {
-                alert('Please install MetaMask!');
             }
-        }
 
-        async function updateBalances() {
-            try {
-                const address = await signer.getAddress();
-                const usdtBalance = await usdtContract.balanceOf(address);
-                const ibUsdtBalance = await contract.balanceOf(address);
-
-                document.getElementById('usdtBalance').innerText = 
-                    ethers.utils.formatUnits(usdtBalance, 6);
-                document.getElementById('ibUsdtBalance').innerText = 
-                    ethers.utils.formatUnits(ibUsdtBalance, 6);
-            } catch (error) {
-                console.error("Error updating balances:", error);
-            }
-        }
-
-        async function updateMarketStats() {
-            try {
-                const supplyRate = await contract.supplyRatePerBlock();
-                const borrowRate = await contract.borrowRatePerBlock();
-                const totalSupply = await contract.totalSupply();
-                const totalBorrow = await contract.totalBorrows();
-
-                const blocksPerYear = 2102400;
-                const supplyApy = (Math.pow((1 + supplyRate / 1e18), blocksPerYear) - 1) * 100;
-                const borrowApy = (Math.pow((1 + borrowRate / 1e18), blocksPerYear) - 1) * 100;
-
-                document.getElementById('supplyApy').innerText = supplyApy.toFixed(2);
-                document.getElementById('borrowApy').innerText = borrowApy.toFixed(2);
-                document.getElementById('totalSupply').innerText = 
-                    ethers.utils.formatUnits(totalSupply, 6);
-                document.getElementById('totalBorrow').innerText = 
-                    ethers.utils.formatUnits(totalBorrow, 6);
-            } catch (error) {
-                console.error("Error updating market stats:", error);
-            }
-        }
-
-        function setupEventListeners() {
-            document.getElementById('supplyButton').addEventListener('click', async () => {
+            async function updateMarketStats() {
                 try {
-                    const amount = document.getElementById('supplyAmount').value;
-                    const amountWei = ethers.utils.parseUnits(amount, 6);
-                    
-                    // First approve USDT spending
-                    const approveTx = await usdtContract.approve(CONTRACT_ADDRESS, amountWei);
-                    await approveTx.wait();
-                    
-                    // Then mint ibUSDT
-                    const mintTx = await contract.mint(amountWei);
-                    await mintTx.wait();
-                    
-                    await updateBalances();
+                    const supplyRate = await contract.supplyRatePerBlock();
+                    const borrowRate = await contract.borrowRatePerBlock();
+                    const totalSupply = await contract.totalSupply();
+                    const totalBorrow = await contract.totalBorrows();
+
+                    const blocksPerYear = 2102400;
+                    const supplyApy = (Math.pow((1 + supplyRate / 1e18), blocksPerYear) - 1) * 100;
+                    const borrowApy = (Math.pow((1 + borrowRate / 1e18), blocksPerYear) - 1) * 100;
+
+                    document.getElementById('supplyApy').innerText = supplyApy.toFixed(2);
+                    document.getElementById('borrowApy').innerText = borrowApy.toFixed(2);
+                    document.getElementById('totalSupply').innerText = 
+                        ethers.utils.formatUnits(totalSupply, 6);
+                    document.getElementById('totalBorrow').innerText = 
+                        ethers.utils.formatUnits(totalBorrow, 6);
                 } catch (error) {
-                    console.error("Supply error:", error);
-                    document.getElementById('statusMessage').innerText = 
-                        'Supply failed: ' + error.message;
+                    console.error("Error updating market stats:", error);
                 }
-            });
+            }
 
-            document.getElementById('withdrawButton').addEventListener('click', async () => {
-                try {
-                    const amount = document.getElementById('withdrawAmount').value;
-                    const amountWei = ethers.utils.parseUnits(amount, 6);
-                    
-                    const tx = await contract.redeem(amountWei);
-                    await tx.wait();
-                    
-                    await updateBalances();
-                } catch (error) {
-                    console.error("Withdraw error:", error);
-                    document.getElementById('statusMessage').innerText = 
-                        'Withdraw failed: ' + error.message;
-                }
-            });
-        }
+            function setupEventListeners() {
+                document.getElementById('supplyButton').addEventListener('click', async () => {
+                    try {
+                        const amount = document.getElementById('supplyAmount').value;
+                        const amountWei = ethers.utils.parseUnits(amount, 6);
+                        
+                        // First approve USDT spending
+                        const approveTx = await usdtContract.approve(CONTRACT_ADDRESS, amountWei);
+                        await approveTx.wait();
+                        
+                        // Then mint ibUSDT
+                        const mintTx = await contract.mint(amountWei);
+                        await mintTx.wait();
+                        
+                        await updateBalances();
+                    } catch (error) {
+                        console.error("Supply error:", error);
+                        document.getElementById('statusMessage').innerText = 
+                            'Supply failed: ' + error.message;
+                    }
+                });
 
-        // Connect button event listener
-        document.getElementById('connectButton').addEventListener('click', connectWallet);
+                document.getElementById('withdrawButton').addEventListener('click', async () => {
+                    try {
+                        const amount = document.getElementById('withdrawAmount').value;
+                        const amountWei = ethers.utils.parseUnits(amount, 6);
+                        
+                        const tx = await contract.redeem(amountWei);
+                        await tx.wait();
+                        
+                        await updateBalances();
+                    } catch (error) {
+                        console.error("Withdraw error:", error);
+                        document.getElementById('statusMessage').innerText = 
+                            'Withdraw failed: ' + error.message;
+                    }
+                });
+            }
 
-        // Setup network change listener
-        if (window.ethereum) {
-            window.ethereum.on('chainChanged', () => {
-                window.location.reload();
-            });
-            window.ethereum.on('accountsChanged', () => {
-                window.location.reload();
-            });
-        }
+            // Connect button event listener
+            document.getElementById('connectButton').addEventListener('click', connectWallet);
+
+            // Setup network change listener
+            if (window.ethereum) {
+                window.ethereum.on('chainChanged', () => {
+                    window.location.reload();
+                });
+                window.ethereum.on('accountsChanged', () => {
+                    window.location.reload();
+                });
+            }
+        });
     </script>
 </body>
 </html>
