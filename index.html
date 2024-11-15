@@ -67,6 +67,7 @@
         <h2>Your Balances</h2>
         <p>USDT Balance: <span id="usdtBalance">Loading...</span></p>
         <p>ibUSDT Balance: <span id="ibUsdtBalance">Loading...</span></p>
+        <p>ibUSDT Value: <span id="ibUsdtValue">Loading...</span> USDT</p>
     </div>
 
     <div class="container">
@@ -103,8 +104,7 @@
 
     <div id="statusMessage"></div>
 
-    <!-- 改用最新版的 ethers -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
     <script>
         const CONTRACT_ADDRESS = "0x994A258c7Dec633865ACf5f89A572e6691DA35af";
         const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
@@ -120,7 +120,7 @@
             "function totalBorrows() external view returns (uint256)",
             "function borrowRatePerBlock() external view returns (uint256)",
             "function supplyRatePerBlock() external view returns (uint256)",
-            "function exchangeRateStored() public view returns (uint256)"
+            "function exchangeRateStored() external view returns (uint256)"
         ];
 
         const USDT_ABI = [
@@ -134,21 +134,6 @@
         let contract;
         let usdtContract;
 
-        async function checkNetwork() {
-            const network = await provider.getNetwork();
-            if (network.chainId !== 1n) { // ETH Mainnet
-                try {
-                    await window.ethereum.request({
-                        method: 'wallet_switchEthereumChain',
-                        params: [{ chainId: '0x1' }], // ETH Mainnet
-                    });
-                } catch (error) {
-                    console.error('Error switching network:', error);
-                    document.getElementById('statusMessage').innerText = 'Please switch to Ethereum Mainnet';
-                }
-            }
-        }
-
         async function connectWallet() {
             try {
                 if (typeof window.ethereum === 'undefined') {
@@ -158,16 +143,26 @@
 
                 await window.ethereum.request({ method: 'eth_requestAccounts' });
                 
-                provider = new ethers.BrowserProvider(window.ethereum);
-                signer = await provider.getSigner();
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
                 
-                await checkNetwork();
+                const network = await provider.getNetwork();
+                if (network.chainId !== 1) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: '0x1' }],
+                        });
+                    } catch (error) {
+                        console.error('Error switching network:', error);
+                        document.getElementById('statusMessage').innerText = 'Please switch to Ethereum Mainnet';
+                        return;
+                    }
+                }
 
                 const address = await signer.getAddress();
                 document.getElementById('connectedAddress').innerText = 
                     address.slice(0,6) + '...' + address.slice(-4);
-                
-                const network = await provider.getNetwork();
                 document.getElementById('networkName').innerText = network.name;
 
                 contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
@@ -177,18 +172,9 @@
                 updateMarketStats();
                 updateBalances();
 
-                provider.on("block", () => {
-                    updateMarketStats();
-                    updateBalances();
-                });
-
-                window.ethereum.on('accountsChanged', function (accounts) {
-                    window.location.reload();
-                });
-
-                window.ethereum.on('chainChanged', function (chainId) {
-                    window.location.reload();
-                });
+                // Set up event listeners for account and network changes
+                window.ethereum.on('accountsChanged', () => window.location.reload());
+                window.ethereum.on('chainChanged', () => window.location.reload());
 
             } catch (error) {
                 console.error('Error connecting wallet:', error);
@@ -198,54 +184,52 @@
 
         async function updateMarketStats() {
             try {
-                const supplyRate = await contract.supplyRatePerBlock();
-                const borrowRate = await contract.borrowRatePerBlock();
-                const totalSupply = await contract.totalSupply();
-                const totalBorrow = await contract.totalBorrows();
-                const exchangeRate = await contract.exchangeRateStored();
+                const [supplyRate, borrowRate, totalSupply, totalBorrow, exchangeRate] = await Promise.all([
+                    contract.supplyRatePerBlock(),
+                    contract.borrowRatePerBlock(),
+                    contract.totalSupply(),
+                    contract.totalBorrows(),
+                    contract.exchangeRateStored()
+                ]);
 
-                const blocksPerYear = 365 * 24 * 60 * 60 / 12; // ETH區塊時間約12秒
-                const supplyApy = (Math.pow((1 + (Number(supplyRate) / 1e18)), blocksPerYear) - 1) * 100;
-                const borrowApy = (Math.pow((1 + (Number(borrowRate) / 1e18)), blocksPerYear) - 1) * 100;
+                const blocksPerYear = 2628000; // Approximate blocks per year
+                const supplyApy = (Math.pow((1 + supplyRate.toNumber() / 1e18), blocksPerYear) - 1) * 100;
+                const borrowApy = (Math.pow((1 + borrowRate.toNumber() / 1e18), blocksPerYear) - 1) * 100;
 
-                const actualTotalSupply = totalSupply * exchangeRate / (10n ** 18n);
+                const totalSupplyUSDT = totalSupply.mul(exchangeRate).div(ethers.constants.WeiPerEther);
                 
                 document.getElementById('supplyApy').innerText = supplyApy.toFixed(2);
                 document.getElementById('borrowApy').innerText = borrowApy.toFixed(2);
-                document.getElementById('totalSupply').innerText = ethers.formatUnits(actualTotalSupply, 6);
-                document.getElementById('totalBorrow').innerText = ethers.formatUnits(totalBorrow, 6);
-                
-                console.log('Current exchange rate:', ethers.formatUnits(exchangeRate, 18));
+                document.getElementById('totalSupply').innerText = ethers.utils.formatUnits(totalSupplyUSDT, 6);
+                document.getElementById('totalBorrow').innerText = ethers.utils.formatUnits(totalBorrow, 6);
             } catch (error) {
                 console.error('Error updating market stats:', error);
-                document.getElementById('statusMessage').innerText = 'Error updating market stats';
             }
         }
 
         async function updateBalances() {
             try {
                 const address = await signer.getAddress();
-                const exchangeRate = await contract.exchangeRateStored();
-                
-                const usdtBalance = await usdtContract.balanceOf(address);
-                const ibUsdtBalance = await contract.balanceOf(address);
-                
-                const actualUsdtValue = ibUsdtBalance * exchangeRate / (10n ** 18n);
-                
+                const [usdtBalance, ibUsdtBalance, exchangeRate] = await Promise.all([
+                    usdtContract.balanceOf(address),
+                    contract.balanceOf(address),
+                    contract.exchangeRateStored()
+                ]);
+
+                const ibUsdtValue = ibUsdtBalance.mul(exchangeRate).div(ethers.constants.WeiPerEther);
+
                 document.getElementById('usdtBalance').innerText = 
-                    ethers.formatUnits(usdtBalance, 6);
+                    ethers.utils.formatUnits(usdtBalance, 6);
                 document.getElementById('ibUsdtBalance').innerText = 
-                    `${ethers.formatUnits(ibUsdtBalance, 6)} (≈ ${ethers.formatUnits(actualUsdtValue, 6)} USDT)`;
-                
+                    ethers.utils.formatUnits(ibUsdtBalance, 6);
+                document.getElementById('ibUsdtValue').innerText = 
+                    ethers.utils.formatUnits(ibUsdtValue, 6);
+
                 const allowance = await usdtContract.allowance(address, CONTRACT_ADDRESS);
-                if (allowance == 0n) {
-                    document.getElementById('supplyButton').innerText = 'Approve USDT';
-                } else {
-                    document.getElementById('supplyButton').innerText = 'Supply';
-                }
+                document.getElementById('supplyButton').innerText = 
+                    allowance.eq(0) ? 'Approve USDT' : 'Supply';
             } catch (error) {
                 console.error('Error updating balances:', error);
-                document.getElementById('statusMessage').innerText = 'Error updating balances';
             }
         }
 
@@ -253,23 +237,21 @@
             document.getElementById('supplyButton').addEventListener('click', async () => {
                 try {
                     const amount = document.getElementById('supplyAmount').value;
+                    const parsedAmount = ethers.utils.parseUnits(amount, 6);
                     const address = await signer.getAddress();
                     const allowance = await usdtContract.allowance(address, CONTRACT_ADDRESS);
 
-                    if (allowance == 0n) {
-                        const tx = await usdtContract.approve(
-                            CONTRACT_ADDRESS,
-                            ethers.MaxUint256
-                        );
+                    if (allowance.eq(0)) {
+                        const tx = await usdtContract.approve(CONTRACT_ADDRESS, ethers.constants.MaxUint256);
                         await tx.wait();
                         document.getElementById('supplyButton').innerText = 'Supply';
                     } else {
-                        const tx = await contract.mint(ethers.parseUnits(amount, 6));
+                        const tx = await contract.mint(parsedAmount);
                         await tx.wait();
                         updateBalances();
                     }
                 } catch (error) {
-                    console.error('Error in supply:', error);
+                    console.error('Supply error:', error);
                     document.getElementById('statusMessage').innerText = 'Error in supply operation';
                 }
             });
@@ -277,11 +259,12 @@
             document.getElementById('withdrawButton').addEventListener('click', async () => {
                 try {
                     const amount = document.getElementById('withdrawAmount').value;
-                    const tx = await contract.redeemUnderlying(ethers.parseUnits(amount, 6));
+                    const parsedAmount = ethers.utils.parseUnits(amount, 6);
+                    const tx = await contract.redeemUnderlying(parsedAmount);
                     await tx.wait();
                     updateBalances();
                 } catch (error) {
-                    console.error('Error in withdraw:', error);
+                    console.error('Withdraw error:', error);
                     document.getElementById('statusMessage').innerText = 'Error in withdraw operation';
                 }
             });
@@ -289,11 +272,12 @@
             document.getElementById('borrowButton').addEventListener('click', async () => {
                 try {
                     const amount = document.getElementById('borrowAmount').value;
-                    const tx = await contract.borrow(ethers.parseUnits(amount, 6));
+                    const parsedAmount = ethers.utils.parseUnits(amount, 6);
+                    const tx = await contract.borrow(parsedAmount);
                     await tx.wait();
                     updateBalances();
                 } catch (error) {
-                    console.error('Error in borrow:', error);
+                    console.error('Borrow error:', error);
                     document.getElementById('statusMessage').innerText = 'Error in borrow operation';
                 }
             });
@@ -301,25 +285,24 @@
             document.getElementById('repayButton').addEventListener('click', async () => {
                 try {
                     const amount = document.getElementById('repayAmount').value;
-                    const tx = await contract.repayBorrow(ethers.parseUnits(amount, 6));
+                    const parsedAmount = ethers.utils.parseUnits(amount, 6);
+                    const tx = await contract.repayBorrow(parsedAmount);
                     await tx.wait();
                     updateBalances();
                 } catch (error) {
-                    console.error('Error in repay:', error);
+                    console.error('Repay error:', error);
                     document.getElementById('statusMessage').innerText = 'Error in repay operation';
                 }
             });
         }
 
-        async function initialize() {
-            document.getElementById('connectButton').addEventListener('click', connectWallet);
-            
-            if (typeof window.ethereum !== 'undefined' && window.ethereum.selectedAddress) {
-                await connectWallet();
-            }
+        // Initialize the application
+        document.getElementById('connectButton').addEventListener('click', connectWallet);
+        
+        // Auto connect if already authorized
+        if (typeof window.ethereum !== 'undefined' && window.ethereum.selectedAddress) {
+            connectWallet();
         }
-
-        initialize();
     </script>
 </body>
 </html>
