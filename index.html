@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>USDT 餘額查詢</title>
-    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -26,20 +26,10 @@
     </div>
 
     <script>
-        // 確保 ethers.js 已載入
-        window.addEventListener('load', function() {
-            if (typeof ethers === 'undefined') {
-                console.error('Ethers.js 未正確載入');
-                return;
-            }
-        });
-
         let userAddress = null;
         
-        // USDT 合約地址（以太坊主網）
         const USDT_ADDRESS = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
         
-        // USDT ABI
         const USDT_ABI = [
             {
                 "constant": true,
@@ -60,10 +50,8 @@
                     document.getElementById('status').innerHTML = 
                         '連接成功！地址: ' + userAddress;
                     
-                    // 連接成功後查詢 USDT 餘額
                     await getUSDTBalance();
 
-                    // 監聽帳戶變化
                     window.ethereum.on('accountsChanged', function (accounts) {
                         userAddress = accounts[0];
                         getUSDTBalance();
@@ -83,17 +71,11 @@
             if (!userAddress) return;
             
             try {
-                // 確保 ethers 已定義
-                if (typeof ethers === 'undefined') {
-                    throw new Error('Ethers.js 未載入');
-                }
-
                 const provider = new ethers.providers.Web3Provider(window.ethereum);
                 const usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, provider);
                 
                 const balance = await usdtContract.balanceOf(userAddress);
                 
-                // USDT 的 decimals 是 6，所以需要除以 10^6
                 const usdtBalance = balance.toString() / 1000000;
                 
                 document.getElementById('usdtBalance').innerHTML = 
