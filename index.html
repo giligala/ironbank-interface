@@ -53,8 +53,6 @@
         <p>Network: <span id="networkName">Not connected</span></p>
     </div>
 
-    <h1>Iron Bank USDT Market</h1>
-    
     <div class="container">
         <h2>Market Stats</h2>
         <p>Supply APY: <span id="supplyApy">Loading...</span>%</p>
@@ -67,7 +65,6 @@
         <h2>Your Balances</h2>
         <p>USDT Balance: <span id="usdtBalance">Loading...</span></p>
         <p>ibUSDT Balance: <span id="ibUsdtBalance">Loading...</span></p>
-        <p>ibUSDT Value: <span id="ibUsdtValue">Loading...</span> USDT</p>
     </div>
 
     <div class="container">
@@ -86,150 +83,101 @@
         </div>
     </div>
 
-    <div class="container">
-        <h2>Borrow</h2>
-        <div class="input-group">
-            <input type="number" id="borrowAmount" placeholder="Amount">
-            <button class="button" id="borrowButton">Borrow</button>
-        </div>
-    </div>
-
-    <div class="container">
-        <h2>Repay</h2>
-        <div class="input-group">
-            <input type="number" id="repayAmount" placeholder="Amount">
-            <button class="button" id="repayButton">Repay</button>
-        </div>
-    </div>
-
     <div id="statusMessage"></div>
 
-    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js" type="application/javascript"></script>
     <script>
-        const CONTRACT_ADDRESS = "0x994A258c7Dec633865ACf5f89A572e6691DA35af";
-        const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
-        
-        const CONTRACT_ABI = [
-            "function mint(uint256) external returns (uint256)",
-            "function redeem(uint256) external returns (uint256)",
-            "function redeemUnderlying(uint256) external returns (uint256)",
-            "function borrow(uint256) external returns (uint256)",
-            "function repayBorrow(uint256) external returns (uint256)",
-            "function balanceOf(address) external view returns (uint256)",
-            "function totalSupply() external view returns (uint256)",
-            "function totalBorrows() external view returns (uint256)",
-            "function borrowRatePerBlock() external view returns (uint256)",
-            "function supplyRatePerBlock() external view returns (uint256)",
-            "function exchangeRateStored() external view returns (uint256)"
-        ];
-
-        const USDT_ABI = [
-            "function approve(address, uint256) external returns (bool)",
-            "function allowance(address, address) external view returns (uint256)",
-            "function balanceOf(address) external view returns (uint256)"
-        ];
-
         let provider;
         let signer;
         let contract;
         let usdtContract;
 
+        const CONTRACT_ADDRESS = "0x994A258c7Dec633865ACf5f89A572e6691DA35af";
+        const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+
+        const CONTRACT_ABI = [
+            "function mint(uint256) external returns (uint256)",
+            "function redeem(uint256) external returns (uint256)",
+            "function balanceOf(address) external view returns (uint256)",
+            "function totalSupply() external view returns (uint256)",
+            "function totalBorrows() external view returns (uint256)",
+            "function borrowRatePerBlock() external view returns (uint256)",
+            "function supplyRatePerBlock() external view returns (uint256)"
+        ];
+
+        const USDT_ABI = [
+            "function approve(address, uint256) external returns (bool)",
+            "function balanceOf(address) external view returns (uint256)",
+            "function allowance(address, address) external view returns (uint256)"
+        ];
+
         async function connectWallet() {
-            try {
-                if (typeof window.ethereum === 'undefined') {
-                    alert('Please install MetaMask!');
-                    return;
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    // Request account access
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
+                    
+                    const address = await signer.getAddress();
+                    document.getElementById('connectedAddress').innerText = 
+                        address.slice(0,6) + '...' + address.slice(-4);
+
+                    const network = await provider.getNetwork();
+                    document.getElementById('networkName').innerText = network.name;
+
+                    contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+                    usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
+
+                    await updateBalances();
+                    await updateMarketStats();
+                    setupEventListeners();
+
+                } catch (error) {
+                    console.error("Error connecting wallet:", error);
+                    document.getElementById('statusMessage').innerText = 
+                        'Failed to connect wallet: ' + error.message;
                 }
-
-                await window.ethereum.request({ method: 'eth_requestAccounts' });
-                
-                provider = new ethers.providers.Web3Provider(window.ethereum);
-                signer = provider.getSigner();
-                
-                const network = await provider.getNetwork();
-                if (network.chainId !== 1) {
-                    try {
-                        await window.ethereum.request({
-                            method: 'wallet_switchEthereumChain',
-                            params: [{ chainId: '0x1' }],
-                        });
-                    } catch (error) {
-                        console.error('Error switching network:', error);
-                        document.getElementById('statusMessage').innerText = 'Please switch to Ethereum Mainnet';
-                        return;
-                    }
-                }
-
-                const address = await signer.getAddress();
-                document.getElementById('connectedAddress').innerText = 
-                    address.slice(0,6) + '...' + address.slice(-4);
-                document.getElementById('networkName').innerText = network.name;
-
-                contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-                usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
-
-                setupEventListeners();
-                updateMarketStats();
-                updateBalances();
-
-                // Set up event listeners for account and network changes
-                window.ethereum.on('accountsChanged', () => window.location.reload());
-                window.ethereum.on('chainChanged', () => window.location.reload());
-
-            } catch (error) {
-                console.error('Error connecting wallet:', error);
-                document.getElementById('statusMessage').innerText = 'Error connecting wallet';
-            }
-        }
-
-        async function updateMarketStats() {
-            try {
-                const [supplyRate, borrowRate, totalSupply, totalBorrow, exchangeRate] = await Promise.all([
-                    contract.supplyRatePerBlock(),
-                    contract.borrowRatePerBlock(),
-                    contract.totalSupply(),
-                    contract.totalBorrows(),
-                    contract.exchangeRateStored()
-                ]);
-
-                const blocksPerYear = 2628000; // Approximate blocks per year
-                const supplyApy = (Math.pow((1 + supplyRate.toNumber() / 1e18), blocksPerYear) - 1) * 100;
-                const borrowApy = (Math.pow((1 + borrowRate.toNumber() / 1e18), blocksPerYear) - 1) * 100;
-
-                const totalSupplyUSDT = totalSupply.mul(exchangeRate).div(ethers.constants.WeiPerEther);
-                
-                document.getElementById('supplyApy').innerText = supplyApy.toFixed(2);
-                document.getElementById('borrowApy').innerText = borrowApy.toFixed(2);
-                document.getElementById('totalSupply').innerText = ethers.utils.formatUnits(totalSupplyUSDT, 6);
-                document.getElementById('totalBorrow').innerText = ethers.utils.formatUnits(totalBorrow, 6);
-            } catch (error) {
-                console.error('Error updating market stats:', error);
+            } else {
+                alert('Please install MetaMask!');
             }
         }
 
         async function updateBalances() {
             try {
                 const address = await signer.getAddress();
-                const [usdtBalance, ibUsdtBalance, exchangeRate] = await Promise.all([
-                    usdtContract.balanceOf(address),
-                    contract.balanceOf(address),
-                    contract.exchangeRateStored()
-                ]);
-
-                const ibUsdtValue = ibUsdtBalance.mul(exchangeRate).div(ethers.constants.WeiPerEther);
+                const usdtBalance = await usdtContract.balanceOf(address);
+                const ibUsdtBalance = await contract.balanceOf(address);
 
                 document.getElementById('usdtBalance').innerText = 
                     ethers.utils.formatUnits(usdtBalance, 6);
                 document.getElementById('ibUsdtBalance').innerText = 
                     ethers.utils.formatUnits(ibUsdtBalance, 6);
-                document.getElementById('ibUsdtValue').innerText = 
-                    ethers.utils.formatUnits(ibUsdtValue, 6);
-
-                const allowance = await usdtContract.allowance(address, CONTRACT_ADDRESS);
-                document.getElementById('supplyButton').innerText = 
-                    allowance.eq(0) ? 'Approve USDT' : 'Supply';
             } catch (error) {
-                console.error('Error updating balances:', error);
+                console.error("Error updating balances:", error);
+            }
+        }
+
+        async function updateMarketStats() {
+            try {
+                const supplyRate = await contract.supplyRatePerBlock();
+                const borrowRate = await contract.borrowRatePerBlock();
+                const totalSupply = await contract.totalSupply();
+                const totalBorrow = await contract.totalBorrows();
+
+                const blocksPerYear = 2102400;
+                const supplyApy = (Math.pow((1 + supplyRate / 1e18), blocksPerYear) - 1) * 100;
+                const borrowApy = (Math.pow((1 + borrowRate / 1e18), blocksPerYear) - 1) * 100;
+
+                document.getElementById('supplyApy').innerText = supplyApy.toFixed(2);
+                document.getElementById('borrowApy').innerText = borrowApy.toFixed(2);
+                document.getElementById('totalSupply').innerText = 
+                    ethers.utils.formatUnits(totalSupply, 6);
+                document.getElementById('totalBorrow').innerText = 
+                    ethers.utils.formatUnits(totalBorrow, 6);
+            } catch (error) {
+                console.error("Error updating market stats:", error);
             }
         }
 
@@ -237,71 +185,52 @@
             document.getElementById('supplyButton').addEventListener('click', async () => {
                 try {
                     const amount = document.getElementById('supplyAmount').value;
-                    const parsedAmount = ethers.utils.parseUnits(amount, 6);
-                    const address = await signer.getAddress();
-                    const allowance = await usdtContract.allowance(address, CONTRACT_ADDRESS);
-
-                    if (allowance.eq(0)) {
-                        const tx = await usdtContract.approve(CONTRACT_ADDRESS, ethers.constants.MaxUint256);
-                        await tx.wait();
-                        document.getElementById('supplyButton').innerText = 'Supply';
-                    } else {
-                        const tx = await contract.mint(parsedAmount);
-                        await tx.wait();
-                        updateBalances();
-                    }
+                    const amountWei = ethers.utils.parseUnits(amount, 6);
+                    
+                    // First approve USDT spending
+                    const approveTx = await usdtContract.approve(CONTRACT_ADDRESS, amountWei);
+                    await approveTx.wait();
+                    
+                    // Then mint ibUSDT
+                    const mintTx = await contract.mint(amountWei);
+                    await mintTx.wait();
+                    
+                    await updateBalances();
                 } catch (error) {
-                    console.error('Supply error:', error);
-                    document.getElementById('statusMessage').innerText = 'Error in supply operation';
+                    console.error("Supply error:", error);
+                    document.getElementById('statusMessage').innerText = 
+                        'Supply failed: ' + error.message;
                 }
             });
 
             document.getElementById('withdrawButton').addEventListener('click', async () => {
                 try {
                     const amount = document.getElementById('withdrawAmount').value;
-                    const parsedAmount = ethers.utils.parseUnits(amount, 6);
-                    const tx = await contract.redeemUnderlying(parsedAmount);
+                    const amountWei = ethers.utils.parseUnits(amount, 6);
+                    
+                    const tx = await contract.redeem(amountWei);
                     await tx.wait();
-                    updateBalances();
+                    
+                    await updateBalances();
                 } catch (error) {
-                    console.error('Withdraw error:', error);
-                    document.getElementById('statusMessage').innerText = 'Error in withdraw operation';
-                }
-            });
-
-            document.getElementById('borrowButton').addEventListener('click', async () => {
-                try {
-                    const amount = document.getElementById('borrowAmount').value;
-                    const parsedAmount = ethers.utils.parseUnits(amount, 6);
-                    const tx = await contract.borrow(parsedAmount);
-                    await tx.wait();
-                    updateBalances();
-                } catch (error) {
-                    console.error('Borrow error:', error);
-                    document.getElementById('statusMessage').innerText = 'Error in borrow operation';
-                }
-            });
-
-            document.getElementById('repayButton').addEventListener('click', async () => {
-                try {
-                    const amount = document.getElementById('repayAmount').value;
-                    const parsedAmount = ethers.utils.parseUnits(amount, 6);
-                    const tx = await contract.repayBorrow(parsedAmount);
-                    await tx.wait();
-                    updateBalances();
-                } catch (error) {
-                    console.error('Repay error:', error);
-                    document.getElementById('statusMessage').innerText = 'Error in repay operation';
+                    console.error("Withdraw error:", error);
+                    document.getElementById('statusMessage').innerText = 
+                        'Withdraw failed: ' + error.message;
                 }
             });
         }
 
-        // Initialize the application
+        // Connect button event listener
         document.getElementById('connectButton').addEventListener('click', connectWallet);
-        
-        // Auto connect if already authorized
-        if (typeof window.ethereum !== 'undefined' && window.ethereum.selectedAddress) {
-            connectWallet();
+
+        // Setup network change listener
+        if (window.ethereum) {
+            window.ethereum.on('chainChanged', () => {
+                window.location.reload();
+            });
+            window.ethereum.on('accountsChanged', () => {
+                window.location.reload();
+            });
         }
     </script>
 </body>
