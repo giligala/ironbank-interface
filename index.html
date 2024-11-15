@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iron Bank Interface</title>
+    <!-- 引入 ethers v6 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.8.1/ethers.umd.min.js" 
+            integrity="sha512-xWH2M5Z1uK149pMNQX3JXVGqAWR+hv1w3KJHyxFHaXBDsqCHQM+Zv5dXu1TExsrzKC2YCeWHisGxkUYrHR6iPg==" 
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -44,8 +48,6 @@
             margin-top: 10px;
         }
     </style>
-    <!-- 修改：使用unpkg的ethers.js CDN -->
-    <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -53,6 +55,7 @@
         <button class="button" id="connectButton">Connect Wallet</button>
         <p>Connected Address: <span id="connectedAddress">Not connected</span></p>
         <p>Network: <span id="networkName">Not connected</span></p>
+        <p>Status: <span id="connectionStatus">Disconnected</span></p>
     </div>
 
     <div class="container">
@@ -88,154 +91,84 @@
     <div id="statusMessage"></div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            let provider;
-            let signer;
-            let contract;
-            let usdtContract;
+        // 等待頁面完全加載
+        window.addEventListener('DOMContentLoaded', () => {
+            const connectButton = document.getElementById('connectButton');
+            const connectionStatus = document.getElementById('connectionStatus');
+            const connectedAddress = document.getElementById('connectedAddress');
+            const networkName = document.getElementById('networkName');
+            const statusMessage = document.getElementById('statusMessage');
 
+            // 合約地址和 ABI
             const CONTRACT_ADDRESS = "0x994A258c7Dec633865ACf5f89A572e6691DA35af";
             const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 
-            const CONTRACT_ABI = [
-                "function mint(uint256) external returns (uint256)",
-                "function redeem(uint256) external returns (uint256)",
-                "function balanceOf(address) external view returns (uint256)",
-                "function totalSupply() external view returns (uint256)",
-                "function totalBorrows() external view returns (uint256)",
-                "function borrowRatePerBlock() external view returns (uint256)",
-                "function supplyRatePerBlock() external view returns (uint256)"
-            ];
+            let provider;
+            let signer;
 
-            const USDT_ABI = [
-                "function approve(address, uint256) external returns (bool)",
-                "function balanceOf(address) external view returns (uint256)",
-                "function allowance(address, address) external view returns (uint256)"
-            ];
+            // 檢查是否安裝了 MetaMask
+            const checkIfMetaMaskInstalled = () => {
+                const { ethereum } = window;
+                if (!ethereum) {
+                    statusMessage.textContent = "請安裝 MetaMask!";
+                    return false;
+                }
+                return true;
+            };
 
+            // 連接錢包
             async function connectWallet() {
-                if (typeof window.ethereum !== 'undefined') {
-                    try {
-                        console.log("Connecting wallet...");
-                        // Request account access
-                        await window.ethereum.request({ method: 'eth_requestAccounts' });
-                        
-                        provider = new ethers.providers.Web3Provider(window.ethereum);
-                        signer = provider.getSigner();
-                        
-                        const address = await signer.getAddress();
-                        console.log("Connected address:", address);
-                        document.getElementById('connectedAddress').innerText = 
-                            address.slice(0,6) + '...' + address.slice(-4);
-
-                        const network = await provider.getNetwork();
-                        document.getElementById('networkName').innerText = network.name;
-
-                        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-                        usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
-
-                        await updateBalances();
-                        await updateMarketStats();
-                        setupEventListeners();
-
-                    } catch (error) {
-                        console.error("Error connecting wallet:", error);
-                        document.getElementById('statusMessage').innerText = 
-                            'Failed to connect wallet: ' + error.message;
-                    }
-                } else {
-                    alert('Please install MetaMask!');
-                }
-            }
-
-            async function updateBalances() {
                 try {
+                    connectionStatus.textContent = "正在連接...";
+                    
+                    if (!checkIfMetaMaskInstalled()) return;
+
+                    // 請求用戶授權連接錢包
+                    const accounts = await window.ethereum.request({ 
+                        method: 'eth_requestAccounts' 
+                    });
+
+                    // 創建 provider
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                    
+                    // 獲取 signer
+                    signer = await provider.getSigner();
+                    
+                    // 獲取當前連接的地址
                     const address = await signer.getAddress();
-                    const usdtBalance = await usdtContract.balanceOf(address);
-                    const ibUsdtBalance = await contract.balanceOf(address);
+                    
+                    // 顯示連接的地址
+                    connectedAddress.textContent = `${address.substring(0, 6)}...${address.substring(38)}`;
+                    
+                    // 獲取並顯示網絡信息
+                    const network = await provider.getNetwork();
+                    networkName.textContent = network.name;
+                    
+                    connectionStatus.textContent = "已連接";
+                    statusMessage.textContent = "錢包連接成功！";
 
-                    document.getElementById('usdtBalance').innerText = 
-                        ethers.utils.formatUnits(usdtBalance, 6);
-                    document.getElementById('ibUsdtBalance').innerText = 
-                        ethers.utils.formatUnits(ibUsdtBalance, 6);
+                    // 設置網絡變更監聽器
+                    window.ethereum.on('chainChanged', () => {
+                        window.location.reload();
+                    });
+
+                    // 設置帳戶變更監聽器
+                    window.ethereum.on('accountsChanged', () => {
+                        window.location.reload();
+                    });
+
                 } catch (error) {
-                    console.error("Error updating balances:", error);
+                    console.error("連接錢包時出錯:", error);
+                    connectionStatus.textContent = "連接失敗";
+                    statusMessage.textContent = `連接錯誤: ${error.message}`;
                 }
             }
 
-            async function updateMarketStats() {
-                try {
-                    const supplyRate = await contract.supplyRatePerBlock();
-                    const borrowRate = await contract.borrowRatePerBlock();
-                    const totalSupply = await contract.totalSupply();
-                    const totalBorrow = await contract.totalBorrows();
+            // 添加連接按鈕點擊事件
+            connectButton.addEventListener('click', connectWallet);
 
-                    const blocksPerYear = 2102400;
-                    const supplyApy = (Math.pow((1 + supplyRate / 1e18), blocksPerYear) - 1) * 100;
-                    const borrowApy = (Math.pow((1 + borrowRate / 1e18), blocksPerYear) - 1) * 100;
-
-                    document.getElementById('supplyApy').innerText = supplyApy.toFixed(2);
-                    document.getElementById('borrowApy').innerText = borrowApy.toFixed(2);
-                    document.getElementById('totalSupply').innerText = 
-                        ethers.utils.formatUnits(totalSupply, 6);
-                    document.getElementById('totalBorrow').innerText = 
-                        ethers.utils.formatUnits(totalBorrow, 6);
-                } catch (error) {
-                    console.error("Error updating market stats:", error);
-                }
-            }
-
-            function setupEventListeners() {
-                document.getElementById('supplyButton').addEventListener('click', async () => {
-                    try {
-                        const amount = document.getElementById('supplyAmount').value;
-                        const amountWei = ethers.utils.parseUnits(amount, 6);
-                        
-                        // First approve USDT spending
-                        const approveTx = await usdtContract.approve(CONTRACT_ADDRESS, amountWei);
-                        await approveTx.wait();
-                        
-                        // Then mint ibUSDT
-                        const mintTx = await contract.mint(amountWei);
-                        await mintTx.wait();
-                        
-                        await updateBalances();
-                    } catch (error) {
-                        console.error("Supply error:", error);
-                        document.getElementById('statusMessage').innerText = 
-                            'Supply failed: ' + error.message;
-                    }
-                });
-
-                document.getElementById('withdrawButton').addEventListener('click', async () => {
-                    try {
-                        const amount = document.getElementById('withdrawAmount').value;
-                        const amountWei = ethers.utils.parseUnits(amount, 6);
-                        
-                        const tx = await contract.redeem(amountWei);
-                        await tx.wait();
-                        
-                        await updateBalances();
-                    } catch (error) {
-                        console.error("Withdraw error:", error);
-                        document.getElementById('statusMessage').innerText = 
-                            'Withdraw failed: ' + error.message;
-                    }
-                });
-            }
-
-            // Connect button event listener
-            document.getElementById('connectButton').addEventListener('click', connectWallet);
-
-            // Setup network change listener
-            if (window.ethereum) {
-                window.ethereum.on('chainChanged', () => {
-                    window.location.reload();
-                });
-                window.ethereum.on('accountsChanged', () => {
-                    window.location.reload();
-                });
-            }
+            // 初始檢查
+            checkIfMetaMaskInstalled();
         });
     </script>
 </body>
