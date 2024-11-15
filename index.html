@@ -44,8 +44,8 @@
             margin-top: 10px;
         }
     </style>
-    <!-- 修改：使用新的 ethers.js CDN -->
-    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
+    <!-- 修改：使用unpkg的ethers.js CDN -->
+    <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -88,8 +88,7 @@
     <div id="statusMessage"></div>
 
     <script>
-        // 等待页面和ethers完全加载
-        window.addEventListener('load', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             let provider;
             let signer;
             let contract;
@@ -117,6 +116,7 @@
             async function connectWallet() {
                 if (typeof window.ethereum !== 'undefined') {
                     try {
+                        console.log("Connecting wallet...");
                         // Request account access
                         await window.ethereum.request({ method: 'eth_requestAccounts' });
                         
@@ -124,6 +124,7 @@
                         signer = provider.getSigner();
                         
                         const address = await signer.getAddress();
+                        console.log("Connected address:", address);
                         document.getElementById('connectedAddress').innerText = 
                             address.slice(0,6) + '...' + address.slice(-4);
 
