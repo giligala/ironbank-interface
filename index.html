@@ -1,175 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iron Bank Interface</title>
-    <!-- 引入 ethers v6 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.8.1/ethers.umd.min.js" 
-            integrity="sha512-xWH2M5Z1uK149pMNQX3JXVGqAWR+hv1w3KJHyxFHaXBDsqCHQM+Zv5dXu1TExsrzKC2YCeWHisGxkUYrHR6iPg==" 
-            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .container {
-            background-color: #f5f5f5;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        .button {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 15px 32px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-        .input-group {
-            margin: 10px 0;
-        }
-        input {
-            padding: 10px;
-            margin-right: 10px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-        }
-        #statusMessage {
-            color: red;
-            margin-top: 10px;
-        }
-    </style>
+    <title>MetaMask 連接測試</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
 </head>
 <body>
-    <div class="container">
-        <h2>Wallet Connection</h2>
-        <button class="button" id="connectButton">Connect Wallet</button>
-        <p>Connected Address: <span id="connectedAddress">Not connected</span></p>
-        <p>Network: <span id="networkName">Not connected</span></p>
-        <p>Status: <span id="connectionStatus">Disconnected</span></p>
-    </div>
-
-    <div class="container">
-        <h2>Market Stats</h2>
-        <p>Supply APY: <span id="supplyApy">Loading...</span>%</p>
-        <p>Borrow APY: <span id="borrowApy">Loading...</span>%</p>
-        <p>Total Supply: <span id="totalSupply">Loading...</span> USDT</p>
-        <p>Total Borrow: <span id="totalBorrow">Loading...</span> USDT</p>
-    </div>
-
-    <div class="container">
-        <h2>Your Balances</h2>
-        <p>USDT Balance: <span id="usdtBalance">Loading...</span></p>
-        <p>ibUSDT Balance: <span id="ibUsdtBalance">Loading...</span></p>
-    </div>
-
-    <div class="container">
-        <h2>Supply</h2>
-        <div class="input-group">
-            <input type="number" id="supplyAmount" placeholder="Amount">
-            <button class="button" id="supplyButton">Supply</button>
-        </div>
-    </div>
-
-    <div class="container">
-        <h2>Withdraw</h2>
-        <div class="input-group">
-            <input type="number" id="withdrawAmount" placeholder="Amount">
-            <button class="button" id="withdrawButton">Withdraw</button>
-        </div>
-    </div>
-
-    <div id="statusMessage"></div>
+    <button onclick="connectWallet()">連接錢包</button>
+    <p id="status"></p>
 
     <script>
-        // 等待頁面完全加載
-        window.addEventListener('DOMContentLoaded', () => {
-            const connectButton = document.getElementById('connectButton');
-            const connectionStatus = document.getElementById('connectionStatus');
-            const connectedAddress = document.getElementById('connectedAddress');
-            const networkName = document.getElementById('networkName');
-            const statusMessage = document.getElementById('statusMessage');
-
-            // 合約地址和 ABI
-            const CONTRACT_ADDRESS = "0x994A258c7Dec633865ACf5f89A572e6691DA35af";
-            const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
-
-            let provider;
-            let signer;
-
-            // 檢查是否安裝了 MetaMask
-            const checkIfMetaMaskInstalled = () => {
-                const { ethereum } = window;
-                if (!ethereum) {
-                    statusMessage.textContent = "請安裝 MetaMask!";
-                    return false;
-                }
-                return true;
-            };
-
-            // 連接錢包
-            async function connectWallet() {
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
                 try {
-                    connectionStatus.textContent = "正在連接...";
-                    
-                    if (!checkIfMetaMaskInstalled()) return;
-
-                    // 請求用戶授權連接錢包
                     const accounts = await window.ethereum.request({ 
                         method: 'eth_requestAccounts' 
                     });
-
-                    // 創建 provider
-                    provider = new ethers.BrowserProvider(window.ethereum);
-                    
-                    // 獲取 signer
-                    signer = await provider.getSigner();
-                    
-                    // 獲取當前連接的地址
-                    const address = await signer.getAddress();
-                    
-                    // 顯示連接的地址
-                    connectedAddress.textContent = `${address.substring(0, 6)}...${address.substring(38)}`;
-                    
-                    // 獲取並顯示網絡信息
-                    const network = await provider.getNetwork();
-                    networkName.textContent = network.name;
-                    
-                    connectionStatus.textContent = "已連接";
-                    statusMessage.textContent = "錢包連接成功！";
-
-                    // 設置網絡變更監聽器
-                    window.ethereum.on('chainChanged', () => {
-                        window.location.reload();
-                    });
-
-                    // 設置帳戶變更監聽器
-                    window.ethereum.on('accountsChanged', () => {
-                        window.location.reload();
-                    });
-
+                    document.getElementById('status').innerHTML = 
+                        '連接成功！地址: ' + accounts[0];
                 } catch (error) {
-                    console.error("連接錢包時出錯:", error);
-                    connectionStatus.textContent = "連接失敗";
-                    statusMessage.textContent = `連接錯誤: ${error.message}`;
+                    document.getElementById('status').innerHTML = 
+                        '連接失敗：' + error.message;
                 }
+            } else {
+                document.getElementById('status').innerHTML = 
+                    '請安裝 MetaMask';
             }
-
-            // 添加連接按鈕點擊事件
-            connectButton.addEventListener('click', connectWallet);
-
-            // 初始檢查
-            checkIfMetaMaskInstalled();
-        });
+        }
     </script>
 </body>
 </html>
