@@ -4,369 +4,277 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Iron Bank Interface</title>
-    <script src="https://unpkg.com/ethers@5.7.0/dist/ethers.umd.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
         }
-
-        .section {
-            background-color: white;
+        .container {
+            background-color: #f5f5f5;
             padding: 20px;
             border-radius: 10px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-
-        h1, h2 {
-            color: #333;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-        }
-
-        .stat-item {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-        }
-
-        .input-group {
-            margin-bottom: 15px;
-        }
-
-        input {
-            width: 100%;
-            padding: 8px;
-            margin-top: 5px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-
-        button {
-            background-color: #28a745;
-            color: white;
-            padding: 10px 20px;
+        .button {
+            background-color: #4CAF50;
             border: none;
-            border-radius: 4px;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
             cursor: pointer;
-            font-size: 14px;
+            border-radius: 4px;
         }
-
-        button:hover {
-            background-color: #218838;
+        .input-group {
+            margin: 10px 0;
         }
-
-        #connectWallet {
-            background-color: #007bff;
+        input {
+            padding: 10px;
+            margin-right: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
         }
-
-        #connectWallet:hover {
-            background-color: #0056b3;
-        }
-
-        #refreshBalance {
-            margin-top: 10px;
-            background-color: #007bff;
-        }
-
-        #refreshBalance:hover {
-            background-color: #0056b3;
-        }
-
-        .action-buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-        }
-
         #statusMessage {
-            color: #dc3545;
+            color: red;
             margin-top: 10px;
-            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <div class="section">
-        <h1>Iron Bank USDT Market</h1>
-        <button id="connectWallet">Connect Wallet</button>
-        <p id="walletAddress">Wallet: Not Connected</p>
-        <p id="statusMessage"></p>
+    <h1>Iron Bank USDT Market</h1>
+    
+    <div class="container">
+        <h2>Market Stats</h2>
+        <p>Supply APY: <span id="supplyApy">Loading...</span>%</p>
+        <p>Borrow APY: <span id="borrowApy">Loading...</span>%</p>
+        <p>Total Supply: <span id="totalSupply">Loading...</span> USDT</p>
+        <p>Total Borrow: <span id="totalBorrow">Loading...</span> USDT</p>
     </div>
 
-    <div class="section">
-        <h2>Market Statistics</h2>
-        <div class="stats">
-            <div class="stat-item">
-                <p>Supply APY: <span id="supplyApy">-</span>%</p>
-            </div>
-            <div class="stat-item">
-                <p>Borrow APY: <span id="borrowApy">-</span>%</p>
-            </div>
-            <div class="stat-item">
-                <p>Total Supply: <span id="totalSupply">-</span> USDT</p>
-            </div>
-            <div class="stat-item">
-                <p>Total Borrow: <span id="totalBorrow">-</span> USDT</p>
-            </div>
-        </div>
-    </div>
-
-    <div class="section">
+    <div class="container">
         <h2>Your Balances</h2>
-        <div class="stats">
-            <div class="stat-item">
-                <p>USDT Balance: <span id="usdtBalance">-</span> USDT</p>
-            </div>
-            <div class="stat-item">
-                <p>ibUSDT Balance: <span id="ibUsdtBalance">-</span> ibUSDT</p>
-            </div>
-            <button id="refreshBalance">Refresh Balances</button>
-        </div>
+        <p>USDT Balance: <span id="usdtBalance">Loading...</span></p>
+        <p>ibUSDT Balance: <span id="ibUsdtBalance">Loading...</span></p>
     </div>
 
-    <div class="section">
+    <div class="container">
         <h2>Supply</h2>
         <div class="input-group">
-            <input type="number" id="supplyAmount" placeholder="Amount to supply">
-            <button id="supplyButton">Supply</button>
+            <input type="number" id="supplyAmount" placeholder="Amount">
+            <button class="button" id="supplyButton">Supply</button>
         </div>
     </div>
 
-    <div class="section">
+    <div class="container">
         <h2>Withdraw</h2>
         <div class="input-group">
-            <input type="number" id="withdrawAmount" placeholder="Amount to withdraw">
-            <button id="withdrawButton">Withdraw</button>
+            <input type="number" id="withdrawAmount" placeholder="Amount">
+            <button class="button" id="withdrawButton">Withdraw</button>
         </div>
     </div>
 
-    <div class="section">
+    <div class="container">
         <h2>Borrow</h2>
         <div class="input-group">
-            <input type="number" id="borrowAmount" placeholder="Amount to borrow">
-            <button id="borrowButton">Borrow</button>
+            <input type="number" id="borrowAmount" placeholder="Amount">
+            <button class="button" id="borrowButton">Borrow</button>
         </div>
     </div>
 
-    <div class="section">
+    <div class="container">
         <h2>Repay</h2>
         <div class="input-group">
-            <input type="number" id="repayAmount" placeholder="Amount to repay">
-            <button id="repayButton">Repay</button>
+            <input type="number" id="repayAmount" placeholder="Amount">
+            <button class="button" id="repayButton">Repay</button>
         </div>
     </div>
 
+    <div id="statusMessage"></div>
+
+    <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js" type="application/javascript"></script>
     <script>
-        // 確保 ethers 已加載
-        window.addEventListener('load', function() {
-            if (typeof ethers === 'undefined') {
-                console.error('Ethers.js failed to load');
-                document.getElementById('statusMessage').innerText = 
-                    'Failed to load required dependencies. Please refresh the page.';
+        const CONTRACT_ADDRESS = "0x994A258c7Dec633865ACf5f89A572e6691DA35af";
+        const USDT_ADDRESS = "0x55d398326f99059fF775485246999027B3197955";
+        
+        const CONTRACT_ABI = [
+            "function mint(uint256) external returns (uint256)",
+            "function redeem(uint256) external returns (uint256)",
+            "function redeemUnderlying(uint256) external returns (uint256)",
+            "function borrow(uint256) external returns (uint256)",
+            "function repayBorrow(uint256) external returns (uint256)",
+            "function balanceOf(address) external view returns (uint256)",
+            "function totalSupply() external view returns (uint256)",
+            "function totalBorrows() external view returns (uint256)",
+            "function borrowRatePerBlock() external view returns (uint256)",
+            "function supplyRatePerBlock() external view returns (uint256)",
+            "function exchangeRateStored() public view returns (uint256)"
+        ];
+
+        const USDT_ABI = [
+            "function approve(address, uint256) external returns (bool)",
+            "function allowance(address, address) external view returns (uint256)",
+            "function balanceOf(address) external view returns (uint256)"
+        ];
+
+        let provider;
+        let signer;
+        let contract;
+        let usdtContract;
+
+        async function initialize() {
+            if (typeof window.ethereum === 'undefined') {
+                alert('Please install MetaMask!');
                 return;
             }
-            console.log('Ethers.js loaded successfully');
-            initializeApp();
-        });
 
-        function initializeApp() {
-            const CONTRACT_ADDRESS = '0x48759F220ED983dB51fA7A8C0D2AAb8f3ce4166a';
-            const USDT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
-            
-            const CONTRACT_ABI = [
-                "function supplyRatePerBlock() external view returns (uint256)",
-                "function borrowRatePerBlock() external view returns (uint256)",
-                "function totalSupply() external view returns (uint256)",
-                "function totalBorrows() external view returns (uint256)",
-                "function balanceOf(address) external view returns (uint256)",
-                "function mint(uint256) external returns (uint256)",
-                "function redeem(uint256) external returns (uint256)",
-                "function borrow(uint256) external returns (uint256)",
-                "function repayBorrow(uint256) external returns (uint256)"
-            ];
-
-            const USDT_ABI = [
-                "function balanceOf(address) external view returns (uint256)",
-                "function allowance(address,address) external view returns (uint256)",
-                "function approve(address,uint256) external returns (bool)"
-            ];
-
-            let provider;
-            let signer;
-            let contract;
-            let usdtContract;
-
-            async function connectWallet() {
-                console.log('Connecting wallet...');
-                document.getElementById('statusMessage').innerText = 'Connecting...';
+            try {
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
                 
-                if (typeof window.ethereum !== 'undefined') {
-                    try {
-                        console.log('MetaMask is installed');
-                        
-                        const accounts = await window.ethereum.request({ 
-                            method: 'eth_requestAccounts' 
-                        });
-                        console.log('Connected accounts:', accounts);
-                        
-                        provider = new ethers.providers.Web3Provider(window.ethereum);
-                        console.log('Provider initialized');
-                        
-                        signer = provider.getSigner();
-                        console.log('Signer obtained');
-                        
-                        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-                        usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
-                        console.log('Contracts initialized');
-                        
-                        const address = await signer.getAddress();
-                        console.log('Wallet address:', address);
-                        document.getElementById('walletAddress').innerText = `Wallet: ${address}`;
-                        
-                        await updateMarketStats();
-                        await updateBalances();
-                        
-                        document.getElementById('statusMessage').innerText = 'Connected successfully!';
-                        console.log('Wallet connection complete');
-                    } catch (error) {
-                        console.error('Detailed connection error:', error);
-                        document.getElementById('statusMessage').innerText = 
-                            `Connection failed: ${error.message}`;
-                    }
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
+                contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+                usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
+
+                setupEventListeners();
+                updateMarketStats();
+                updateBalances();
+
+                // 監聽鏈上事件
+                provider.on("block", () => {
+                    updateMarketStats();
+                    updateBalances();
+                });
+            } catch (error) {
+                console.error('Error initializing:', error);
+                document.getElementById('statusMessage').innerText = 'Error initializing application';
+            }
+        }
+
+        async function updateMarketStats() {
+            try {
+                const supplyRate = await contract.supplyRatePerBlock();
+                const borrowRate = await contract.borrowRatePerBlock();
+                const totalSupply = await contract.totalSupply();
+                const totalBorrow = await contract.totalBorrows();
+                const exchangeRate = await contract.exchangeRateStored();
+
+                const blocksPerYear = 365 * 24 * 60 * 60 / 3;
+                const supplyApy = (Math.pow((1 + (supplyRate / 1e18)), blocksPerYear) - 1) * 100;
+                const borrowApy = (Math.pow((1 + (borrowRate / 1e18)), blocksPerYear) - 1) * 100;
+
+                // 使用 exchangeRate 進行換算
+                const actualTotalSupply = totalSupply.mul(exchangeRate).div(ethers.BigNumber.from(10).pow(18));
+                
+                document.getElementById('supplyApy').innerText = supplyApy.toFixed(2);
+                document.getElementById('borrowApy').innerText = borrowApy.toFixed(2);
+                document.getElementById('totalSupply').innerText = ethers.utils.formatUnits(actualTotalSupply, 6);
+                document.getElementById('totalBorrow').innerText = ethers.utils.formatUnits(totalBorrow, 6);
+                
+                // 顯示當前匯率供參考
+                const exchangeRateFormatted = parseFloat(ethers.utils.formatUnits(exchangeRate, 18));
+                console.log('Current exchange rate:', exchangeRateFormatted);
+            } catch (error) {
+                console.error('Error updating market stats:', error);
+                document.getElementById('statusMessage').innerText = 'Error updating market stats';
+            }
+        }
+
+        async function updateBalances() {
+            try {
+                const address = await signer.getAddress();
+                const exchangeRate = await contract.exchangeRateStored();
+                
+                const usdtBalance = await usdtContract.balanceOf(address);
+                const ibUsdtBalance = await contract.balanceOf(address);
+                
+                // 計算實際的 USDT 價值
+                const actualUsdtValue = ibUsdtBalance.mul(exchangeRate).div(ethers.BigNumber.from(10).pow(18));
+                
+                document.getElementById('usdtBalance').innerText = 
+                    ethers.utils.formatUnits(usdtBalance, 6);
+                document.getElementById('ibUsdtBalance').innerText = 
+                    `${ethers.utils.formatUnits(ibUsdtBalance, 6)} (≈ ${ethers.utils.formatUnits(actualUsdtValue, 6)} USDT)`;
+                
+                const allowance = await usdtContract.allowance(address, CONTRACT_ADDRESS);
+                if (allowance.eq(0)) {
+                    document.getElementById('supplyButton').innerText = 'Approve USDT';
                 } else {
-                    console.log('MetaMask not found');
-                    document.getElementById('statusMessage').innerText = 
-                        'Please install MetaMask!';
+                    document.getElementById('supplyButton').innerText = 'Supply';
                 }
+            } catch (error) {
+                console.error('Error updating balances:', error);
+                document.getElementById('statusMessage').innerText = 'Error updating balances';
             }
+        }
 
-            async function updateMarketStats() {
-                try {
-                    const supplyRate = await contract.supplyRatePerBlock();
-                    const borrowRate = await contract.borrowRatePerBlock();
-                    const totalSupply = await contract.totalSupply();
-                    const totalBorrow = await contract.totalBorrows();
-
-                    const blocksPerYear = 365 * 24 * 60 * 60 / 20;
-                    const supplyApy = (Math.pow((1 + (supplyRate / 1e18)), blocksPerYear) - 1) * 100;
-                    const borrowApy = (Math.pow((1 + (borrowRate / 1e18)), blocksPerYear) - 1) * 100;
-
-                    document.getElementById('supplyApy').innerText = supplyApy.toFixed(2);
-                    document.getElementById('borrowApy').innerText = borrowApy.toFixed(2);
-                    document.getElementById('totalSupply').innerText = ethers.utils.formatUnits(totalSupply, 6);
-                    document.getElementById('totalBorrow').innerText = ethers.utils.formatUnits(totalBorrow, 6);
-                } catch (error) {
-                    console.error('Error updating market stats:', error);
-                    document.getElementById('statusMessage').innerText = 
-                        'Error updating market stats';
-                }
-            }
-
-            async function updateBalances() {
-                try {
-                    const address = await signer.getAddress();
-                    
-                    const usdtBalance = await usdtContract.balanceOf(address);
-                    document.getElementById('usdtBalance').innerText = 
-                        ethers.utils.formatUnits(usdtBalance, 6);
-                    
-                    const ibUsdtBalance = await contract.balanceOf(address);
-                    document.getElementById('ibUsdtBalance').innerText = 
-                        ethers.utils.formatUnits(ibUsdtBalance, 6);
-                    
-                    const allowance = await usdtContract.allowance(address, CONTRACT_ADDRESS);
-                    if (allowance.eq(0)) {
-                        document.getElementById('supplyButton').innerText = 'Approve USDT';
-                    } else {
-                        document.getElementById('supplyButton').innerText = 'Supply';
-                    }
-                } catch (error) {
-                    console.error('Error updating balances:', error);
-                    document.getElementById('statusMessage').innerText = 
-                        'Error updating balances';
-                }
-            }
-
-            // Add event listeners
-            document.getElementById('connectWallet').addEventListener('click', connectWallet);
-            document.getElementById('refreshBalance').addEventListener('click', updateBalances);
-
+        function setupEventListeners() {
             document.getElementById('supplyButton').addEventListener('click', async () => {
-                const amount = document.getElementById('supplyAmount').value;
                 try {
+                    const amount = document.getElementById('supplyAmount').value;
                     const address = await signer.getAddress();
                     const allowance = await usdtContract.allowance(address, CONTRACT_ADDRESS);
-                    
+
                     if (allowance.eq(0)) {
-                        const maxAmount = ethers.constants.MaxUint256;
-                        const approveTx = await usdtContract.approve(CONTRACT_ADDRESS, maxAmount);
-                        await approveTx.wait();
+                        const tx = await usdtContract.approve(
+                            CONTRACT_ADDRESS,
+                            ethers.constants.MaxUint256
+                        );
+                        await tx.wait();
                         document.getElementById('supplyButton').innerText = 'Supply';
                     } else {
                         const tx = await contract.mint(ethers.utils.parseUnits(amount, 6));
                         await tx.wait();
-                        updateMarketStats();
                         updateBalances();
                     }
                 } catch (error) {
-                    console.error('Error supplying:', error);
-                    document.getElementById('statusMessage').innerText = 
-                        `Transaction failed: ${error.message}`;
+                    console.error('Error in supply:', error);
+                    document.getElementById('statusMessage').innerText = 'Error in supply operation';
                 }
             });
 
             document.getElementById('withdrawButton').addEventListener('click', async () => {
-                const amount = document.getElementById('withdrawAmount').value;
                 try {
-                    const tx = await contract.redeem(ethers.utils.parseUnits(amount, 6));
+                    const amount = document.getElementById('withdrawAmount').value;
+                    const tx = await contract.redeemUnderlying(ethers.utils.parseUnits(amount, 6));
                     await tx.wait();
-                    updateMarketStats();
                     updateBalances();
                 } catch (error) {
-                    console.error('Error withdrawing:', error);
-                    document.getElementById('statusMessage').innerText = 
-                        `Transaction failed: ${error.message}`;
+                    console.error('Error in withdraw:', error);
+                    document.getElementById('statusMessage').innerText = 'Error in withdraw operation';
                 }
             });
 
             document.getElementById('borrowButton').addEventListener('click', async () => {
-                const amount = document.getElementById('borrowAmount').value;
                 try {
+                    const amount = document.getElementById('borrowAmount').value;
                     const tx = await contract.borrow(ethers.utils.parseUnits(amount, 6));
                     await tx.wait();
-                    updateMarketStats();
                     updateBalances();
                 } catch (error) {
-                    console.error('Error borrowing:', error);
-                    document.getElementById('statusMessage').innerText = 
-                        `Transaction failed: ${error.message}`;
+                    console.error('Error in borrow:', error);
+                    document.getElementById('statusMessage').innerText = 'Error in borrow operation';
                 }
             });
 
             document.getElementById('repayButton').addEventListener('click', async () => {
-                const amount = document.getElementById('repayAmount').value;
                 try {
+                    const amount = document.getElementById('repayAmount').value;
                     const tx = await contract.repayBorrow(ethers.utils.parseUnits(amount, 6));
                     await tx.wait();
-                    updateMarketStats();
                     updateBalances();
                 } catch (error) {
-                    console.error('Error repaying:', error);
-                    document.getElementById('statusMessage').innerText = 
-                        `Transaction failed: ${error.message}`;
+                    console.error('Error in repay:', error);
+                    document.getElementById('statusMessage').innerText = 'Error in repay operation';
                 }
             });
         }
+
+        initialize();
     </script>
 </body>
 </html>
